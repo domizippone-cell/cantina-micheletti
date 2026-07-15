@@ -38,6 +38,18 @@ function parseImporto(str) {
   return parseFloat(s) || 0;
 }
 
+// Se imponibile + IVA non fa il totale, restituisce la somma calcolata
+// (con una piccola tolleranza per gli arrotondamenti), altrimenti null.
+function sommaChenonQuadra(row) {
+  if (row.status !== 'done') return null;
+  const imp = Number(row.imponibile) || 0;
+  const iva = Number(row.iva) || 0;
+  const tot = Number(row.totale) || 0;
+  if (!imp && !iva && !tot) return null;
+  const somma = imp + iva;
+  return Math.abs(somma - tot) > 0.05 ? somma : null;
+}
+
 function EditableCell({ value, column, onCommit }) {
   const { type, options, optionLabel, display } = column;
   const [editing, setEditing] = useState(false);
@@ -115,7 +127,7 @@ function EditableCell({ value, column, onCommit }) {
   );
 }
 
-function StatusChip({ row, canRetry, onRetry }) {
+function StatusChip({ row, onRetry }) {
   switch (row.status) {
     case 'queued':
       return <span className="chip chip-wait">In coda</span>;
@@ -131,11 +143,9 @@ function StatusChip({ row, canRetry, onRetry }) {
       return (
         <span className="chip chip-err" title={row.error}>
           ⚠ Errore
-          {canRetry && (
-            <button className="retry" onClick={onRetry}>
-              Riprova
-            </button>
-          )}
+          <button className="retry" onClick={onRetry}>
+            Riprova
+          </button>
         </span>
       );
     default:
@@ -143,7 +153,7 @@ function StatusChip({ row, canRetry, onRetry }) {
   }
 }
 
-export default function DataTable({ rows, onEdit, onRetry, onDelete, canRetry }) {
+export default function DataTable({ rows, onEdit, onRetry, onDelete, onOpenFile }) {
   if (rows.length === 0) {
     return (
       <div className="empty">
@@ -170,40 +180,56 @@ export default function DataTable({ rows, onEdit, onRetry, onDelete, canRetry })
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr key={row.id} className={row.status === 'error' ? 'row-error' : ''}>
-              <td className="td-file">
-                <div className="file-name" title={row.fileName}>
-                  {row.fileName}
-                </div>
-                <StatusChip
-                  row={row}
-                  canRetry={canRetry(row.id)}
-                  onRetry={() => onRetry(row.id)}
-                />
-                {row.status === 'error' && <div className="error-text">{row.error}</div>}
-              </td>
-              {COLUMNS.map((c) => (
-                <td key={c.key} className={c.type === 'number' ? 'td-num' : ''}>
-                  <EditableCell
-                    value={row[c.key]}
-                    column={c}
-                    onCommit={(v) => onEdit(row.id, { [c.key]: v })}
-                  />
+          {rows.map((row) => {
+            const somma = sommaChenonQuadra(row);
+            const rowClass =
+              row.status === 'error' ? 'row-error' : somma !== null ? 'row-warn' : '';
+            return (
+              <tr key={row.id} className={rowClass}>
+                <td className="td-file">
+                  <button
+                    className="file-name file-link"
+                    title={'Apri il documento originale: ' + row.fileName}
+                    onClick={() => onOpenFile(row.id)}
+                  >
+                    {row.fileName}
+                  </button>
+                  <StatusChip row={row} onRetry={() => onRetry(row.id)} />
+                  {row.status === 'error' && <div className="error-text">{row.error}</div>}
+                  {somma !== null && (
+                    <div
+                      className="check-warn"
+                      title={
+                        formatEuro(row.imponibile) + ' + ' + formatEuro(row.iva) + ' = ' +
+                        formatEuro(somma) + ', ma il Totale indicato è ' + formatEuro(row.totale)
+                      }
+                    >
+                      ⚠ Imponibile + IVA ≠ Totale
+                    </div>
+                  )}
                 </td>
-              ))}
-              <td className="td-del">
-                <button
-                  className="del"
-                  onClick={() => onDelete(row.id)}
-                  title="Elimina riga"
-                  aria-label={'Elimina ' + row.fileName}
-                >
-                  ✕
-                </button>
-              </td>
-            </tr>
-          ))}
+                {COLUMNS.map((c) => (
+                  <td key={c.key} className={c.type === 'number' ? 'td-num' : ''}>
+                    <EditableCell
+                      value={row[c.key]}
+                      column={c}
+                      onCommit={(v) => onEdit(row.id, { [c.key]: v })}
+                    />
+                  </td>
+                ))}
+                <td className="td-del">
+                  <button
+                    className="del"
+                    onClick={() => onDelete(row.id)}
+                    title="Elimina riga"
+                    aria-label={'Elimina ' + row.fileName}
+                  >
+                    ✕
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
         <tfoot>
           <tr>

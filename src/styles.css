@@ -537,6 +537,186 @@ body {
   margin-top: 22px;
 }
 
+/* ---------- Schede Documenti / Riepilogo ---------- */
+
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-soft);
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: var(--text);
+}
+
+.tab.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.tabs-print {
+  margin-left: auto;
+}
+
+/* ---------- Nome file cliccabile (archivio) ---------- */
+
+button.file-name {
+  font: inherit;
+  font-weight: 600;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--text);
+  display: block;
+  max-width: 100%;
+}
+
+button.file-name:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+/* ---------- Avviso "i conti non tornano" ---------- */
+
+.row-warn {
+  background: var(--warn-soft);
+}
+
+.row-warn:hover {
+  background: var(--warn-soft) !important;
+}
+
+.check-warn {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--warn);
+  cursor: help;
+}
+
+/* ---------- Riepilogo mensile ---------- */
+
+.riepilogo {
+  padding: 4px 20px 20px;
+}
+
+.mese {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.mese:last-child {
+  border-bottom: none;
+}
+
+.mese-testa {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.mese-testa h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.mese-saldo {
+  font-weight: 700;
+  color: var(--ok);
+  font-variant-numeric: tabular-nums;
+}
+
+.mese-saldo.negativo {
+  color: var(--err);
+}
+
+.mese-totali {
+  margin-top: 6px;
+  font-size: 14px;
+  color: var(--text-soft);
+}
+
+.mese-categorie {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 420px;
+}
+
+.mese-categorie li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.mese-categorie li span:last-child {
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+/* ---------- Avviso temporaneo ---------- */
+
+.toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--text);
+  color: #fff;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 14px;
+  z-index: 100;
+  box-shadow: var(--shadow);
+  max-width: 90vw;
+}
+
+/* ---------- Stampa (riepilogo per il commercialista) ---------- */
+
+@media print {
+  .header,
+  .dropzone,
+  .footer,
+  .tabs,
+  .toolbar,
+  .td-del,
+  .toast {
+    display: none !important;
+  }
+
+  body,
+  .app {
+    background: #fff;
+  }
+
+  .card {
+    border: none;
+    box-shadow: none;
+  }
+}
+
 /* ---------- Mobile ---------- */
 
 @media (max-width: 640px) {
