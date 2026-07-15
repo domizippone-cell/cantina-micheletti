@@ -167,9 +167,15 @@ export default function App() {
     }
   }
 
-  // Da un backup arrivano solo le righe che qui non c'erano già.
-  function handleImportaRighe(nuove) {
+  // Import "aggiungi": dal backup arrivano solo le righe non già presenti.
+  function handleAggiungiRighe(nuove) {
     if (nuove.length > 0) setRows((rs) => [...rs, ...nuove.map(sanificaRiga)]);
+  }
+
+  // Import "sostituisci": il backup rimpiazza in blocco i dati del dispositivo.
+  function handleSostituisciRighe(righe) {
+    filesRef.current.clear();
+    setRows(righe.map(sanificaRiga));
   }
 
   const busy = rows.some((r) => r.status === 'queued' || r.status === 'processing');
@@ -313,7 +319,8 @@ export default function App() {
         <ApiKeyModal
           onClose={() => setShowSettings(false)}
           rows={rows}
-          onImportaRighe={handleImportaRighe}
+          onAggiungiRighe={handleAggiungiRighe}
+          onSostituisciRighe={handleSostituisciRighe}
         />
       )}
       {toast && <div className="toast">{toast}</div>}

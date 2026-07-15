@@ -38,12 +38,23 @@ export function salvaRecord(id, record) {
 }
 
 // Tutti i documenti archiviati, come [{ id, blob, name, type }].
+// Chiavi e valori vengono letti nella STESSA transazione: IndexedDB li
+// restituisce entrambi ordinati per chiave, così restano allineati.
 export async function tuttiDocumenti() {
-  const [chiavi, valori] = await Promise.all([
-    conStore('readonly', (st) => st.getAllKeys()),
-    conStore('readonly', (st) => st.getAll()),
-  ]);
-  return chiavi.map((id, i) => ({ id, ...valori[i] }));
+  const db = await apriDb();
+  try {
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readonly');
+      const st = tx.objectStore(STORE);
+      const chiavi = st.getAllKeys();
+      const valori = st.getAll();
+      tx.oncomplete = () => resolve(chiavi.result.map((id, i) => ({ id, ...valori.result[i] })));
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+  } finally {
+    db.close();
+  }
 }
 
 export function leggiDocumento(id) {
