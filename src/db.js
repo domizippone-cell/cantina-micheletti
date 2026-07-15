@@ -32,6 +32,20 @@ export function salvaDocumento(id, file) {
   return conStore('readwrite', (st) => st.put({ blob: file, name: file.name, type: file.type }, id));
 }
 
+// Usata dall'import di un backup, dove il file arriva già come record.
+export function salvaRecord(id, record) {
+  return conStore('readwrite', (st) => st.put(record, id));
+}
+
+// Tutti i documenti archiviati, come [{ id, blob, name, type }].
+export async function tuttiDocumenti() {
+  const [chiavi, valori] = await Promise.all([
+    conStore('readonly', (st) => st.getAllKeys()),
+    conStore('readonly', (st) => st.getAll()),
+  ]);
+  return chiavi.map((id, i) => ({ id, ...valori[i] }));
+}
+
 export function leggiDocumento(id) {
   return conStore('readonly', (st) => st.get(id));
 }

@@ -68,6 +68,7 @@ export async function extractDocument(file) {
     tipo: fields.tipo === 'vendita' ? 'vendita' : 'acquisto',
     controparte: String(fields.controparte ?? ''),
     data: String(fields.data ?? ''),
+    scadenza: String(fields.scadenza ?? ''),
     partita_iva: String(fields.partita_iva ?? ''),
     imponibile: Number(fields.imponibile) || 0,
     iva: Number(fields.iva) || 0,

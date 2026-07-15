@@ -1,9 +1,5 @@
 import React from 'react';
-
-const MESI = [
-  'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
-  'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre',
-];
+import { chiaveMese, etichettaMese } from '../date.js';
 
 const euroFormat = new Intl.NumberFormat('it-IT', {
   minimumFractionDigits: 2,
@@ -12,15 +8,8 @@ const euroFormat = new Intl.NumberFormat('it-IT', {
 
 const fmt = (v) => euroFormat.format(Number(v) || 0) + ' €';
 
-function chiaveMese(data) {
-  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(String(data || '').trim());
-  return m ? m[3] + '-' + m[2].padStart(2, '0') : null;
-}
-
-function etichettaMese(chiave) {
-  if (chiave === 'senza-data') return 'Senza data';
-  const [anno, mese] = chiave.split('-');
-  return (MESI[Number(mese) - 1] || mese) + ' ' + anno;
+function etichetta(chiave) {
+  return chiave === 'senza-data' ? 'Senza data' : etichettaMese(chiave);
 }
 
 export default function Riepilogo({ rows }) {
@@ -61,7 +50,7 @@ export default function Riepilogo({ rows }) {
         return (
           <div className="mese" key={k}>
             <div className="mese-testa">
-              <h3>{etichettaMese(k)}</h3>
+              <h3>{etichetta(k)}</h3>
               <span className={'mese-saldo' + (saldo < 0 ? ' negativo' : '')}>
                 Saldo {saldo >= 0 ? '+' : '−'} {fmt(Math.abs(saldo))}
               </span>

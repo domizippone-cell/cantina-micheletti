@@ -3,28 +3,37 @@ import DropZone from './components/DropZone.jsx';
 import DataTable from './components/DataTable.jsx';
 import ApiKeyModal from './components/ApiKeyModal.jsx';
 import Riepilogo from './components/Riepilogo.jsx';
+import Scadenzario, { scadenzeUrgenti } from './components/Scadenzario.jsx';
+import Filtri, { FILTRI_VUOTI, filtraRighe } from './components/Filtri.jsx';
 import { extractDocument, errorMessage, getApiKey } from './gemini.js';
 import { exportCsv } from './csv.js';
 import { salvaDocumento, leggiDocumento, eliminaDocumento, svuotaDocumenti } from './db.js';
 import { ricordaControparte, applicaMemoria } from './memoria.js';
+import { chiaveMese } from './date.js';
 
 const ROWS_STORAGE = 'estrattore.rows';
 
+// Le righe rimaste a metà da una sessione precedente diventano errori
+// (si possono riprovare: il file è nell'archivio del dispositivo); le
+// righe salvate da versioni precedenti dell'app — o arrivate da un backup —
+// ricevono i campi nuovi.
+function sanificaRiga(r) {
+  return {
+    tipo: 'acquisto',
+    categoria: 'Altro',
+    scadenza: '',
+    pagato: false,
+    ...r,
+    controparte: r.controparte ?? r.fornitore ?? '',
+    ...(r.status === 'queued' || r.status === 'processing'
+      ? { status: 'error', error: 'Elaborazione interrotta: premi Riprova.' }
+      : {}),
+  };
+}
+
 function loadRows() {
   try {
-    const saved = JSON.parse(localStorage.getItem(ROWS_STORAGE) || '[]');
-    // Le righe rimaste a metà da una sessione precedente diventano errori
-    // (si possono riprovare: il file è nell'archivio del dispositivo); le
-    // righe salvate da versioni precedenti dell'app ricevono i campi nuovi.
-    return saved.map((r) => ({
-      tipo: 'acquisto',
-      categoria: 'Altro',
-      ...r,
-      controparte: r.controparte ?? r.fornitore ?? '',
-      ...(r.status === 'queued' || r.status === 'processing'
-        ? { status: 'error', error: 'Elaborazione interrotta: premi Riprova.' }
-        : {}),
-    }));
+    return JSON.parse(localStorage.getItem(ROWS_STORAGE) || '[]').map(sanificaRiga);
   } catch {
     return [];
   }
@@ -33,6 +42,7 @@ function loadRows() {
 export default function App() {
   const [rows, setRows] = useState(loadRows);
   const [view, setView] = useState('documenti');
+  const [filtri, setFiltri] = useState(FILTRI_VUOTI);
   const [showSettings, setShowSettings] = useState(false);
   const [toast, setToast] = useState('');
   const toastTimer = useRef(null);
@@ -100,11 +110,13 @@ export default function App() {
         tipo: 'acquisto',
         controparte: '',
         data: '',
+        scadenza: '',
         partita_iva: '',
         imponibile: 0,
         iva: 0,
         totale: 0,
         categoria: 'Altro',
+        pagato: false,
         error: '',
       };
     });
@@ -155,7 +167,18 @@ export default function App() {
     }
   }
 
+  // Da un backup arrivano solo le righe che qui non c'erano già.
+  function handleImportaRighe(nuove) {
+    if (nuove.length > 0) setRows((rs) => [...rs, ...nuove.map(sanificaRiga)]);
+  }
+
   const busy = rows.some((r) => r.status === 'queued' || r.status === 'processing');
+  const righeVisibili = filtraRighe(rows, filtri);
+  const filtriAttivi = !!(filtri.testo.trim() || filtri.tipo || filtri.categoria || filtri.mese);
+  const mesiDisponibili = [...new Set(rows.map((r) => chiaveMese(r.data)).filter(Boolean))].sort(
+    (a, b) => b.localeCompare(a)
+  );
+  const urgenti = scadenzeUrgenti(rows);
 
   const euroFormat = new Intl.NumberFormat('it-IT', {
     minimumFractionDigits: 2,
@@ -163,7 +186,9 @@ export default function App() {
   });
   const totalePer = (tipo) =>
     euroFormat.format(
-      rows.filter((r) => r.tipo === tipo).reduce((acc, r) => acc + (Number(r.totale) || 0), 0)
+      righeVisibili
+        .filter((r) => r.tipo === tipo)
+        .reduce((acc, r) => acc + (Number(r.totale) || 0), 0)
     ) + ' €';
 
   return (
@@ -198,24 +223,41 @@ export default function App() {
               Documenti
             </button>
             <button
+              className={'tab' + (view === 'scadenze' ? ' active' : '')}
+              onClick={() => setView('scadenze')}
+            >
+              Scadenze
+              {urgenti > 0 && <span className="tab-badge">{urgenti}</span>}
+            </button>
+            <button
               className={'tab' + (view === 'riepilogo' ? ' active' : '')}
               onClick={() => setView('riepilogo')}
             >
               Riepilogo mensile
             </button>
-            {view === 'riepilogo' && (
+            {(view === 'riepilogo' || view === 'scadenze') && (
               <button className="btn btn-ghost tabs-print" onClick={() => window.print()}>
                 🖨 Stampa
               </button>
             )}
           </div>
 
-          {view === 'documenti' ? (
+          {view === 'documenti' && (
             <>
               <div className="toolbar">
                 <div className="toolbar-info">
-                  <strong>{rows.length}</strong> {rows.length === 1 ? 'documento' : 'documenti'}
-                  {rows.length > 0 && (
+                  {filtriAttivi ? (
+                    <>
+                      <strong>{righeVisibili.length}</strong> di {rows.length}{' '}
+                      {rows.length === 1 ? 'documento' : 'documenti'}
+                    </>
+                  ) : (
+                    <>
+                      <strong>{rows.length}</strong>{' '}
+                      {rows.length === 1 ? 'documento' : 'documenti'}
+                    </>
+                  )}
+                  {righeVisibili.length > 0 && (
                     <span className="stats">
                       {' · '}
                       <span className="stat stat-vendite">Vendite {totalePer('vendita')}</span>
@@ -231,24 +273,35 @@ export default function App() {
                   </button>
                   <button
                     className="btn btn-primary"
-                    onClick={() => exportCsv(rows)}
-                    disabled={rows.length === 0}
+                    onClick={() => exportCsv(righeVisibili)}
+                    disabled={righeVisibili.length === 0}
+                    title={
+                      filtriAttivi
+                        ? 'Esporta solo i documenti mostrati dai filtri'
+                        : 'Esporta tutti i documenti'
+                    }
                   >
                     ⬇ Esporta Excel
                   </button>
                 </div>
               </div>
+              {rows.length > 0 && (
+                <Filtri filtri={filtri} onChange={setFiltri} mesi={mesiDisponibili} />
+              )}
               <DataTable
-                rows={rows}
+                rows={righeVisibili}
+                vuotoPerFiltri={filtriAttivi}
                 onEdit={handleEdit}
                 onRetry={handleRetry}
                 onDelete={handleDelete}
                 onOpenFile={handleOpenFile}
               />
             </>
-          ) : (
-            <Riepilogo rows={rows} />
           )}
+          {view === 'scadenze' && (
+            <Scadenzario rows={rows} onEdit={handleEdit} onOpenFile={handleOpenFile} />
+          )}
+          {view === 'riepilogo' && <Riepilogo rows={rows} />}
         </section>
       </main>
 
@@ -256,7 +309,13 @@ export default function App() {
         I dati restano su questo dispositivo · Estrazione con Google Gemini
       </footer>
 
-      {showSettings && <ApiKeyModal onClose={() => setShowSettings(false)} />}
+      {showSettings && (
+        <ApiKeyModal
+          onClose={() => setShowSettings(false)}
+          rows={rows}
+          onImportaRighe={handleImportaRighe}
+        />
+      )}
       {toast && <div className="toast">{toast}</div>}
     </div>
   );

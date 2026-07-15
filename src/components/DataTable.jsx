@@ -14,6 +14,7 @@ const COLUMNS = [
   },
   { key: 'controparte', label: 'Cliente / Fornitore', type: 'text' },
   { key: 'data', label: 'Data', type: 'text' },
+  { key: 'scadenza', label: 'Scadenza', type: 'text' },
   { key: 'partita_iva', label: 'Partita IVA', type: 'text' },
   { key: 'categoria', label: 'Categoria', type: 'select', options: CATEGORIES },
   { key: 'imponibile', label: 'Imponibile', type: 'number' },
@@ -36,6 +37,26 @@ function parseImporto(str) {
   if (!s) return 0;
   if (s.includes(',')) return parseFloat(s.replace(/\./g, '').replace(',', '.')) || 0;
   return parseFloat(s) || 0;
+}
+
+// Due documenti con stessa controparte, stessa data e stesso totale sono
+// quasi certamente lo stesso foglio caricato due volte: la mappa restituita
+// associa l'id di ogni copia al nome del file caricato per primo.
+function trovaDoppioni(rows) {
+  const primi = new Map();
+  const doppioni = new Map();
+  for (const r of rows) {
+    if (r.status !== 'done') continue;
+    const chi = /^\d{11}$/.test(r.partita_iva || '')
+      ? 'piva:' + r.partita_iva
+      : String(r.controparte || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    const totale = Number(r.totale) || 0;
+    if (!chi || !totale || !r.data) continue;
+    const chiave = chi + '|' + r.data + '|' + totale.toFixed(2);
+    if (primi.has(chiave)) doppioni.set(r.id, primi.get(chiave).fileName);
+    else primi.set(chiave, r);
+  }
+  return doppioni;
 }
 
 // Se imponibile + IVA non fa il totale, restituisce la somma calcolata
@@ -153,9 +174,14 @@ function StatusChip({ row, onRetry }) {
   }
 }
 
-export default function DataTable({ rows, onEdit, onRetry, onDelete, onOpenFile }) {
+export default function DataTable({ rows, vuotoPerFiltri, onEdit, onRetry, onDelete, onOpenFile }) {
   if (rows.length === 0) {
-    return (
+    return vuotoPerFiltri ? (
+      <div className="empty">
+        <p>Nessun documento corrisponde alla ricerca.</p>
+        <p className="empty-hint">Prova a cambiare i filtri o premi «✕ Pulisci».</p>
+      </div>
+    ) : (
       <div className="empty">
         <p>Nessun documento ancora.</p>
         <p className="empty-hint">Trascina una fattura qui sopra per iniziare.</p>
@@ -164,6 +190,7 @@ export default function DataTable({ rows, onEdit, onRetry, onDelete, onOpenFile 
   }
 
   const sum = (key) => rows.reduce((acc, r) => acc + (Number(r[key]) || 0), 0);
+  const doppioni = trovaDoppioni(rows);
 
   return (
     <div className="table-wrap">
@@ -176,14 +203,20 @@ export default function DataTable({ rows, onEdit, onRetry, onDelete, onOpenFile 
                 {c.label}
               </th>
             ))}
+            <th className="th-pagata">Pagata</th>
             <th />
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => {
             const somma = sommaChenonQuadra(row);
+            const doppioneDi = doppioni.get(row.id);
             const rowClass =
-              row.status === 'error' ? 'row-error' : somma !== null ? 'row-warn' : '';
+              row.status === 'error'
+                ? 'row-error'
+                : somma !== null || doppioneDi
+                  ? 'row-warn'
+                  : '';
             return (
               <tr key={row.id} className={rowClass}>
                 <td className="td-file">
@@ -207,6 +240,17 @@ export default function DataTable({ rows, onEdit, onRetry, onDelete, onOpenFile 
                       ⚠ Imponibile + IVA ≠ Totale
                     </div>
                   )}
+                  {doppioneDi && (
+                    <div
+                      className="check-warn"
+                      title={
+                        'Stessa controparte, stessa data e stesso totale di «' + doppioneDi +
+                        '»: probabilmente è lo stesso documento caricato due volte.'
+                      }
+                    >
+                      ⚠ Possibile doppione di «{doppioneDi}»
+                    </div>
+                  )}
                 </td>
                 {COLUMNS.map((c) => (
                   <td key={c.key} className={c.type === 'number' ? 'td-num' : ''}>
@@ -217,6 +261,18 @@ export default function DataTable({ rows, onEdit, onRetry, onDelete, onOpenFile 
                     />
                   </td>
                 ))}
+                <td className="td-pagata">
+                  <input
+                    type="checkbox"
+                    className="check-pagata"
+                    checked={!!row.pagato}
+                    onChange={(e) => onEdit(row.id, { pagato: e.target.checked })}
+                    title={row.tipo === 'vendita' ? 'Incassata' : 'Pagata'}
+                    aria-label={
+                      (row.tipo === 'vendita' ? 'Incassata: ' : 'Pagata: ') + row.fileName
+                    }
+                  />
+                </td>
                 <td className="td-del">
                   <button
                     className="del"
@@ -233,11 +289,11 @@ export default function DataTable({ rows, onEdit, onRetry, onDelete, onOpenFile 
         </tbody>
         <tfoot>
           <tr>
-            <td colSpan={6}>Totali</td>
+            <td colSpan={7}>Totali</td>
             <td className="td-num">{formatEuro(sum('imponibile'))}</td>
             <td className="td-num">{formatEuro(sum('iva'))}</td>
             <td className="td-num">{formatEuro(sum('totale'))}</td>
-            <td />
+            <td colSpan={2} />
           </tr>
         </tfoot>
       </table>

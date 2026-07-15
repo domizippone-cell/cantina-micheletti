@@ -15,11 +15,13 @@ export function exportCsv(rows) {
     'Tipo',
     'Cliente/Fornitore',
     'Data',
+    'Scadenza',
     'Partita IVA',
     'Categoria',
     'Imponibile',
     'IVA',
     'Totale',
+    'Pagata',
     'File',
   ];
   const lines = rows.map((r) =>
@@ -27,11 +29,13 @@ export function exportCsv(rows) {
       r.tipo === 'vendita' ? 'Vendita' : 'Acquisto',
       r.controparte,
       r.data,
+      r.scadenza,
       r.partita_iva,
       r.categoria,
       num(r.imponibile),
       num(r.iva),
       num(r.totale),
+      r.pagato ? 'Sì' : 'No',
       r.fileName,
     ]
       .map(quote)

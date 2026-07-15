@@ -36,6 +36,11 @@ Analizza il documento allegato (fattura, bolletta, ricevuta o nota) ed estrai qu
   (il cliente in caso di vendita, il fornitore in caso di acquisto).
   Non scrivere mai "Micheletti" in questo campo.
 - data: la data di emissione del documento, in formato GG/MM/AAAA
+- scadenza: la data entro cui va pagato il documento, in formato GG/MM/AAAA.
+  Cercala nelle diciture "scadenza", "data scadenza", "pagamento entro" o simili.
+  Se è indicato solo un termine di pagamento (es. "30 gg d.f.", "60 giorni fine mese"),
+  calcola la scadenza a partire dalla data di emissione. Se il documento non dà
+  alcuna indicazione, stringa vuota.
 - partita_iva: la Partita IVA della controparte (11 cifre, senza il prefisso "IT");
   se la controparte è un privato senza P.IVA, stringa vuota
 - imponibile: l'importo imponibile complessivo, in euro
@@ -63,11 +68,15 @@ export const RESPONSE_SCHEMA = {
     tipo: { type: 'STRING', enum: ['acquisto', 'vendita'] },
     controparte: { type: 'STRING' },
     data: { type: 'STRING', description: 'Data di emissione in formato GG/MM/AAAA' },
+    scadenza: {
+      type: 'STRING',
+      description: 'Data di scadenza del pagamento in GG/MM/AAAA, vuota se non indicata',
+    },
     partita_iva: { type: 'STRING' },
     imponibile: { type: 'NUMBER' },
     iva: { type: 'NUMBER' },
     totale: { type: 'NUMBER' },
     categoria: { type: 'STRING', enum: CATEGORIES },
   },
-  required: ['tipo', 'controparte', 'data', 'partita_iva', 'imponibile', 'iva', 'totale', 'categoria'],
+  required: ['tipo', 'controparte', 'data', 'scadenza', 'partita_iva', 'imponibile', 'iva', 'totale', 'categoria'],
 };

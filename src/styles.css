@@ -147,6 +147,10 @@ body {
   color: var(--text-soft);
 }
 
+.dropzone-camera {
+  margin-top: 16px;
+}
+
 /* ---------- Toolbar ---------- */
 
 .toolbar {
@@ -191,6 +195,50 @@ body {
   gap: 8px;
 }
 
+/* ---------- Ricerca e filtri ---------- */
+
+.filtri {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  background: #fdfbfa;
+}
+
+.filtro-testo {
+  font: inherit;
+  font-size: 14px;
+  flex: 1;
+  min-width: 200px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  outline: none;
+  background: var(--card);
+}
+
+.filtro-testo:focus {
+  border-color: var(--accent);
+}
+
+.filtro-select {
+  font: inherit;
+  font-size: 13.5px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  outline: none;
+  background: var(--card);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.filtro-select:focus {
+  border-color: var(--accent);
+}
+
 /* ---------- Buttons ---------- */
 
 .btn {
@@ -229,6 +277,12 @@ body {
   color: var(--text);
 }
 
+.btn-sm {
+  font-size: 13px;
+  padding: 6px 12px;
+  white-space: nowrap;
+}
+
 /* ---------- Table ---------- */
 
 .table-wrap {
@@ -239,7 +293,7 @@ body {
   width: 100%;
   border-collapse: collapse;
   font-size: 14px;
-  min-width: 1000px;
+  min-width: 1150px;
 }
 
 .table th {
@@ -302,6 +356,22 @@ body {
 .td-del {
   width: 40px;
   text-align: center;
+}
+
+.th-pagata {
+  text-align: center;
+}
+
+.td-pagata {
+  width: 60px;
+  text-align: center;
+}
+
+.check-pagata {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer;
 }
 
 /* Celle modificabili */
@@ -572,6 +642,19 @@ body {
   margin-left: auto;
 }
 
+.tab-badge {
+  display: inline-block;
+  min-width: 18px;
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 99px;
+  background: var(--err);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+
 /* ---------- Nome file cliccabile (archivio) ---------- */
 
 button.file-name {
@@ -676,6 +759,155 @@ button.file-name:hover {
   color: var(--text);
 }
 
+/* ---------- Scadenzario ---------- */
+
+.scadenzario {
+  padding: 4px 20px 20px;
+}
+
+.scad-gruppo {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.scad-gruppo:last-child {
+  border-bottom: none;
+}
+
+.scad-testa {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.scad-testa h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.scad-totale {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.scad-hint {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.scad-lista {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.scad-voce {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--border);
+}
+
+.scad-voce:last-child {
+  border-bottom: none;
+}
+
+.scad-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.scad-dettagli {
+  margin-top: 3px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.scad-data {
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.scad-badge {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 99px;
+  background: var(--bg);
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+
+.scad-ritardo {
+  background: var(--err-soft);
+  color: var(--err);
+}
+
+.scad-presto {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.scad-importo {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.scad-fatta .scad-importo,
+.scad-fatta .file-name {
+  text-decoration: line-through;
+  color: var(--text-soft);
+}
+
+.scad-toggle {
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+/* ---------- Backup (nel pannello impostazioni) ---------- */
+
+.modal-sezione {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.modal-sezione h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.backup-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.backup-stato {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
 /* ---------- Avviso temporaneo ---------- */
 
 .toast {
@@ -701,7 +933,10 @@ button.file-name:hover {
   .footer,
   .tabs,
   .toolbar,
+  .filtri,
   .td-del,
+  .scad-voce .btn,
+  .scad-toggle,
   .toast {
     display: none !important;
   }
@@ -743,5 +978,13 @@ button.file-name:hover {
 
   .toolbar {
     padding: 12px 14px;
+  }
+
+  .filtri {
+    padding: 10px 14px;
+  }
+
+  .scadenzario {
+    padding: 4px 14px 16px;
   }
 }
