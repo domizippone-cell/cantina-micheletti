@@ -170,6 +170,84 @@ body {
   margin-top: 16px;
 }
 
+/* ---------- Dashboard ---------- */
+
+.dashboard {
+  padding: 16px;
+}
+
+.dash-griglia {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.dash-tile {
+  font: inherit;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fdfbfa;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.dash-tile:hover {
+  border-color: var(--accent);
+  background: var(--card);
+}
+
+.dash-tile.warn {
+  background: var(--warn-soft);
+  border-color: var(--warn);
+}
+
+.dash-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-soft);
+}
+
+.dash-valore {
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.dash-valore.pos {
+  color: var(--ok);
+}
+
+.dash-valore.neg {
+  color: var(--err);
+}
+
+.dash-sub {
+  font-size: 12.5px;
+  color: var(--text-soft);
+}
+
+.dash-avviso {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.dash-avviso strong {
+  color: var(--accent);
+}
+
 /* ---------- Toolbar ---------- */
 
 .toolbar {
@@ -258,6 +336,46 @@ body {
   border-color: var(--accent);
 }
 
+.filtro-data {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.filtro-data input[type='date'] {
+  cursor: pointer;
+}
+
+.filtro-controlla {
+  background: transparent;
+  color: var(--warn);
+  border: 1px solid var(--border);
+}
+
+.filtro-controlla:not(:disabled):hover {
+  background: var(--warn-soft);
+}
+
+.filtro-controlla.attivo {
+  background: var(--warn-soft);
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+/* Badge nota di credito nella cella del documento */
+.nc-badge {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 1px 8px;
+  border-radius: 99px;
+}
+
 /* ---------- Buttons ---------- */
 
 .btn {
@@ -312,7 +430,7 @@ body {
   width: 100%;
   border-collapse: collapse;
   font-size: 14px;
-  min-width: 1150px;
+  min-width: 1450px;
 }
 
 .table th {
@@ -579,9 +697,75 @@ body {
   max-width: 460px;
 }
 
+.modal-largo {
+  max-width: 640px;
+}
+
 .modal h2 {
   margin: 0 0 10px;
   font-size: 18px;
+}
+
+/* Riconciliazione */
+.ric-lista {
+  max-height: 46vh;
+  overflow-y: auto;
+  margin: 6px 0 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ric-voce {
+  display: grid;
+  grid-template-columns: auto 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 6px;
+  border-bottom: 1px dashed var(--border);
+  cursor: pointer;
+  font-size: 13.5px;
+}
+
+.ric-voce input[type='checkbox'] {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--accent);
+}
+
+.ric-mov,
+.ric-doc {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ric-mov strong,
+.ric-doc strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ric-sub {
+  font-size: 12px;
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ric-freccia {
+  color: var(--text-soft);
+}
+
+@media (max-width: 560px) {
+  .ric-voce {
+    grid-template-columns: auto 1fr;
+  }
+  .ric-freccia {
+    display: none;
+  }
 }
 
 .modal-text {
@@ -717,6 +901,91 @@ button.file-name:hover {
   padding: 4px 20px 20px;
 }
 
+/* Stima IVA trimestrale */
+.iva-box {
+  padding: 16px 0 20px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+
+.iva-testa h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.iva-nota {
+  display: block;
+  margin-top: 3px;
+  font-size: 12.5px;
+  color: var(--text-soft);
+}
+
+.iva-cards {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.iva-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #fdfbfa;
+}
+
+.iva-card-titolo {
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.iva-card-riga {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text-soft);
+  padding: 2px 0;
+}
+
+.iva-card-riga span:last-child {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.iva-card-saldo {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-weight: 700;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.iva-card-saldo.credito {
+  color: var(--ok);
+}
+
+.mese-confronto {
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--text-soft);
+}
+
+.mese-confronto .su {
+  color: var(--ok);
+  font-weight: 700;
+}
+
+.mese-confronto .giu {
+  color: var(--err);
+  font-weight: 700;
+}
+
 .mese {
   padding: 16px 0;
   border-bottom: 1px solid var(--border);
@@ -776,6 +1045,198 @@ button.file-name:hover {
 .mese-categorie li span:last-child {
   font-variant-numeric: tabular-nums;
   color: var(--text);
+}
+
+/* ---------- Grafici ---------- */
+
+.grafici {
+  padding: 8px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.graf-blocco {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.graf-blocco:last-child {
+  border-bottom: none;
+}
+
+.graf-testa {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.graf-testa h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.graf-controlli {
+  display: flex;
+  gap: 8px;
+}
+
+.graf-legenda {
+  display: flex;
+  gap: 14px;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.graf-legenda span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pallino {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+}
+
+.graf-scroll {
+  overflow-x: auto;
+}
+
+.graf-svg {
+  width: 100%;
+  min-width: 480px;
+  height: auto;
+}
+
+.graf-asse {
+  font-size: 10px;
+  fill: var(--text-soft);
+}
+
+.graf-vuoto {
+  font-size: 13.5px;
+  color: var(--text-soft);
+  margin: 4px 0;
+}
+
+/* Torta */
+.torta-wrap {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.torta-svg {
+  width: 180px;
+  height: 180px;
+  flex-shrink: 0;
+}
+
+.torta-centro-num {
+  font-size: 15px;
+  font-weight: 800;
+  fill: var(--text);
+}
+
+.torta-centro-lab {
+  font-size: 10px;
+  fill: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.torta-legenda {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.torta-legenda li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+}
+
+.torta-cat {
+  flex: 1;
+}
+
+.torta-val {
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Top controparti */
+.top-griglia {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 24px;
+}
+
+.top-lista h4 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  color: var(--text-soft);
+}
+
+.top-lista ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.top-riga-testa {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13.5px;
+}
+
+.top-nome {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.top-val {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.top-barra-sfondo {
+  height: 8px;
+  background: var(--bg);
+  border-radius: 99px;
+  margin: 4px 0 2px;
+  overflow: hidden;
+}
+
+.top-barra {
+  height: 100%;
+  border-radius: 99px;
+}
+
+.top-conteggio {
+  font-size: 12px;
+  color: var(--text-soft);
 }
 
 /* ---------- Scadenzario ---------- */
@@ -881,6 +1342,49 @@ button.file-name:hover {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.scad-importo-nota {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.scad-parziale {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.scad-azioni {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.scad-acconto-link {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  white-space: nowrap;
+}
+
+.scad-acconto-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.scad-acconto-input {
+  width: 90px;
+  text-align: right;
 }
 
 .scad-fatta .scad-importo,
@@ -1011,6 +1515,7 @@ button.file-name:hover {
   .filtri,
   .td-del,
   .scad-voce .btn,
+  .scad-acconto-link,
   .scad-toggle,
   .toast {
     display: none !important;

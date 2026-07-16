@@ -1,10 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 import DropZone from './components/DropZone.jsx';
+import Dashboard from './components/Dashboard.jsx';
 import DataTable from './components/DataTable.jsx';
+import Grafici from './components/Grafici.jsx';
+import Riconciliazione from './components/Riconciliazione.jsx';
 import ApiKeyModal from './components/ApiKeyModal.jsx';
 import Riepilogo from './components/Riepilogo.jsx';
 import Scadenzario, { scadenzeUrgenti } from './components/Scadenzario.jsx';
-import Filtri, { FILTRI_VUOTI, filtraRighe } from './components/Filtri.jsx';
+import Filtri, { FILTRI_VUOTI, filtraRighe, filtriAttivi } from './components/Filtri.jsx';
+import { contaProblemi, netto } from './calcoli.js';
+import { aggiornaPromemoria } from './notifiche.js';
 import { extractDocument, errorMessage, getApiKey } from './gemini.js';
 import { exportCsv } from './csv.js';
 import { salvaDocumento, leggiDocumento, eliminaDocumento, svuotaDocumenti } from './db.js';
@@ -34,6 +39,10 @@ function conDefault(r) {
     categoria: 'Altro',
     scadenza: '',
     pagato: false,
+    acconto: 0,
+    metodo: '',
+    nota: '',
+    notaCredito: false,
     error: '',
     ...r,
     controparte: r.controparte ?? r.fornitore ?? '',
@@ -67,6 +76,7 @@ export default function App() {
   const [view, setView] = useState('documenti');
   const [filtri, setFiltri] = useState(FILTRI_VUOTI);
   const [showSettings, setShowSettings] = useState(false);
+  const [showRiconcilia, setShowRiconcilia] = useState(false);
   const [toast, setToast] = useState('');
   const toastTimer = useRef(null);
   const filesRef = useRef(new Map()); // id riga → File, per l'elaborazione in corso
@@ -76,6 +86,39 @@ export default function App() {
   useEffect(() => {
     rowsRef.current = rows;
   }, [rows]);
+
+  // Promemoria scadenze: a ogni cambiamento aggiorna l'elenco per il service
+  // worker e, se serve, mostra l'avviso. Non fa nulla se le notifiche sono spente.
+  useEffect(() => {
+    aggiornaPromemoria(rows);
+  }, [rows]);
+
+  // File arrivati da "Condividi" di un'altra app (WhatsApp, Gmail, Foto): il
+  // service worker li ha messi da parte, qui li raccogliamo e li mettiamo in coda.
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get('condivisi') !== '1') return;
+    if (!('caches' in window)) return;
+    (async () => {
+      try {
+        const cache = await caches.open('condivisi');
+        const chiavi = await cache.keys();
+        const files = [];
+        for (const req of chiavi) {
+          const res = await cache.match(req);
+          if (!res) continue;
+          const blob = await res.blob();
+          const nome = decodeURIComponent(res.headers.get('x-nome-file') || 'condiviso');
+          files.push(new File([blob], nome, { type: blob.type || 'application/octet-stream' }));
+          await cache.delete(req);
+        }
+        if (files.length) handleFiles(files);
+      } catch {
+        /* niente da raccogliere */
+      }
+      history.replaceState(null, '', location.pathname);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // In locale: salva le righe su questo dispositivo a ogni modifica.
   // In sync: la fonte è Firestore (con la sua cache offline), non localStorage.
@@ -209,6 +252,10 @@ export default function App() {
         totale: 0,
         categoria: 'Altro',
         pagato: false,
+        acconto: 0,
+        metodo: '',
+        nota: '',
+        notaCredito: false,
         error: '',
       };
     });
@@ -319,7 +366,8 @@ export default function App() {
 
   const busy = rows.some((r) => r.status === 'queued' || r.status === 'processing');
   const righeVisibili = filtraRighe(rows, filtri);
-  const filtriAttivi = !!(filtri.testo.trim() || filtri.tipo || filtri.categoria || filtri.mese);
+  const ciSonoFiltri = filtriAttivi(filtri);
+  const nProblemi = contaProblemi(rows);
   const mesiDisponibili = [...new Set(rows.map((r) => chiaveMese(r.data)).filter(Boolean))].sort(
     (a, b) => b.localeCompare(a)
   );
@@ -333,7 +381,7 @@ export default function App() {
     euroFormat.format(
       righeVisibili
         .filter((r) => r.tipo === tipo)
-        .reduce((acc, r) => acc + (Number(r.totale) || 0), 0)
+        .reduce((acc, r) => acc + netto(r, 'totale'), 0)
     ) + ' €';
 
   return (
@@ -366,6 +414,16 @@ export default function App() {
       <main className="main">
         <DropZone onFiles={handleFiles} />
 
+        <Dashboard
+          rows={rows}
+          onVaiScadenze={() => setView('scadenze')}
+          onVaiRiepilogo={() => setView('riepilogo')}
+          onVaiControllare={() => {
+            setView('documenti');
+            setFiltri({ ...FILTRI_VUOTI, daControllare: true });
+          }}
+        />
+
         <section className="card table-card">
           <div className="tabs">
             <button
@@ -387,7 +445,13 @@ export default function App() {
             >
               Riepilogo mensile
             </button>
-            {(view === 'riepilogo' || view === 'scadenze') && (
+            <button
+              className={'tab' + (view === 'grafici' ? ' active' : '')}
+              onClick={() => setView('grafici')}
+            >
+              Grafici
+            </button>
+            {(view === 'riepilogo' || view === 'scadenze' || view === 'grafici') && (
               <button className="btn btn-ghost tabs-print" onClick={() => window.print()}>
                 🖨 Stampa
               </button>
@@ -398,7 +462,7 @@ export default function App() {
             <>
               <div className="toolbar">
                 <div className="toolbar-info">
-                  {filtriAttivi ? (
+                  {ciSonoFiltri ? (
                     <>
                       <strong>{righeVisibili.length}</strong> di {rows.length}{' '}
                       {rows.length === 1 ? 'documento' : 'documenti'}
@@ -428,7 +492,7 @@ export default function App() {
                     onClick={() => exportCsv(righeVisibili)}
                     disabled={righeVisibili.length === 0}
                     title={
-                      filtriAttivi
+                      ciSonoFiltri
                         ? 'Esporta solo i documenti mostrati dai filtri'
                         : 'Esporta tutti i documenti'
                     }
@@ -438,11 +502,16 @@ export default function App() {
                 </div>
               </div>
               {rows.length > 0 && (
-                <Filtri filtri={filtri} onChange={setFiltri} mesi={mesiDisponibili} />
+                <Filtri
+                  filtri={filtri}
+                  onChange={setFiltri}
+                  mesi={mesiDisponibili}
+                  nProblemi={nProblemi}
+                />
               )}
               <DataTable
                 rows={righeVisibili}
-                vuotoPerFiltri={filtriAttivi}
+                vuotoPerFiltri={ciSonoFiltri}
                 onEdit={handleEdit}
                 onRetry={handleRetry}
                 onDelete={handleDelete}
@@ -454,6 +523,7 @@ export default function App() {
             <Scadenzario rows={rows} onEdit={handleEdit} onOpenFile={handleOpenFile} />
           )}
           {view === 'riepilogo' && <Riepilogo rows={rows} />}
+          {view === 'grafici' && <Grafici rows={rows} mesi={mesiDisponibili} />}
         </section>
       </main>
 
@@ -474,7 +544,11 @@ export default function App() {
           syncCode={syncOn ? getSyncCode() : ''}
           onAttivaSync={handleAttivaSync}
           onDisattivaSync={handleDisattivaSync}
+          onApriRiconciliazione={() => setShowRiconcilia(true)}
         />
+      )}
+      {showRiconcilia && (
+        <Riconciliazione rows={rows} onEdit={handleEdit} onClose={() => setShowRiconcilia(false)} />
       )}
       {toast && <div className="toast">{toast}</div>}
     </div>

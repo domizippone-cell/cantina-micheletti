@@ -73,6 +73,7 @@ export async function extractDocument(file) {
     imponibile: Number(fields.imponibile) || 0,
     iva: Number(fields.iva) || 0,
     totale: Number(fields.totale) || 0,
+    notaCredito: fields.nota_credito === true,
     categoria: CATEGORIES.includes(fields.categoria) ? fields.categoria : 'Altro',
   };
 }

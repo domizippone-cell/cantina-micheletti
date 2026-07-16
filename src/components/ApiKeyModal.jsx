@@ -1,6 +1,14 @@
 import React, { useRef, useState } from 'react';
 import { getApiKey, setApiKey } from '../gemini.js';
 import { esportaBackup, leggiBackup, aggiungiDaBackup, sostituisciConBackup } from '../backup.js';
+import {
+  notificheSupportate,
+  notificheAbilitate,
+  permessoNotifiche,
+  attivaNotifiche,
+  disattivaNotifiche,
+  aggiornaPromemoria,
+} from '../notifiche.js';
 
 export default function ApiKeyModal({
   onClose,
@@ -12,13 +20,37 @@ export default function ApiKeyModal({
   syncCode,
   onAttivaSync,
   onDisattivaSync,
+  onApriRiconciliazione,
 }) {
   const [key, setKey] = useState(getApiKey());
   const [show, setShow] = useState(false);
   const [statoBackup, setStatoBackup] = useState('');
   const [inAttesa, setInAttesa] = useState(null); // backup letto, in attesa della scelta
   const [copiato, setCopiato] = useState(false);
+  const [notifOn, setNotifOn] = useState(notificheAbilitate());
+  const [notifNota, setNotifNota] = useState('');
   const importRef = useRef(null);
+
+  async function attivaPromemoria() {
+    const ok = await attivaNotifiche();
+    if (ok) {
+      setNotifOn(true);
+      setNotifNota('Promemoria attivi. Riceverai un avviso quando una scadenza è vicina.');
+      aggiornaPromemoria(rows);
+    } else {
+      setNotifNota(
+        permessoNotifiche() === 'denied'
+          ? 'Le notifiche sono bloccate nelle impostazioni del browser: sbloccale per questo sito.'
+          : 'Permesso non concesso: non posso mostrare i promemoria.'
+      );
+    }
+  }
+
+  function spegniPromemoria() {
+    disattivaNotifiche();
+    setNotifOn(false);
+    setNotifNota('Promemoria disattivati su questo dispositivo.');
+  }
 
   const linkSync = syncCode
     ? `${location.origin}${location.pathname}#sync=${syncCode}`
@@ -179,6 +211,51 @@ export default function ApiKeyModal({
               </p>
             </>
           )}
+        </div>
+
+        <div className="modal-sezione">
+          <h3>Riconciliazione estratto conto</h3>
+          <p className="modal-text">
+            Importa il CSV della banca per spuntare in automatico le fatture già pagate o
+            incassate, confrontando gli importi. Utile a fine mese.
+          </p>
+          <button
+            className="btn btn-ghost"
+            onClick={() => { onClose(); onApriRiconciliazione(); }}
+          >
+            ⇄ Apri riconciliazione
+          </button>
+        </div>
+
+        <div className="modal-sezione">
+          <h3>Promemoria scadenze</h3>
+          {!notificheSupportate() ? (
+            <p className="modal-text">
+              Questo dispositivo non supporta le notifiche. Le scadenze restano comunque
+              visibili nella scheda «Scadenze».
+            </p>
+          ) : notifOn ? (
+            <>
+              <p className="modal-text">
+                <strong>🔔 Attivi.</strong> Quando apri l'app ti avviso delle scadenze imminenti;
+                su Android (app installata) provo ad avvisarti anche a app chiusa.
+              </p>
+              <button className="btn btn-ghost" onClick={spegniPromemoria}>
+                Disattiva promemoria
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="modal-text">
+                Attiva un avviso quando una fattura sta per scadere, così non ti sfugge un
+                pagamento o un incasso.
+              </p>
+              <button className="btn btn-primary" onClick={attivaPromemoria}>
+                🔔 Attiva promemoria
+              </button>
+            </>
+          )}
+          {notifNota && <p className="backup-stato">{notifNota}</p>}
         </div>
 
         <div className="modal-sezione">

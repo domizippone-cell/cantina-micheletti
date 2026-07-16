@@ -13,29 +13,37 @@ function quote(v) {
 export function exportCsv(rows) {
   const header = [
     'Tipo',
+    'Nota di credito',
     'Cliente/Fornitore',
     'Data',
     'Scadenza',
     'Partita IVA',
     'Categoria',
+    'Metodo pagamento',
     'Imponibile',
     'IVA',
     'Totale',
+    'Acconto',
     'Pagata',
+    'Note',
     'File',
   ];
   const lines = rows.map((r) =>
     [
       r.tipo === 'vendita' ? 'Vendita' : 'Acquisto',
+      r.notaCredito ? 'Sì' : 'No',
       r.controparte,
       r.data,
       r.scadenza,
       r.partita_iva,
       r.categoria,
+      r.metodo || '',
       num(r.imponibile),
       num(r.iva),
       num(r.totale),
+      num(r.acconto),
       r.pagato ? 'Sì' : 'No',
+      r.nota || '',
       r.fileName,
     ]
       .map(quote)

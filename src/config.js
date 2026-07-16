@@ -23,6 +23,9 @@ export const CATEGORIES = [
   'Altro',
 ];
 
+// Metodi di pagamento selezionabili per ogni documento (colonna "Pagamento").
+export const METODI_PAGAMENTO = ['Bonifico', 'Contanti', 'Assegno', 'RiBa', 'Carta'];
+
 // Il prompt inviato a Gemini insieme a ogni documento.
 export const EXTRACTION_PROMPT = `
 Sei l'assistente contabile della Cantina Micheletti di Castagneto Carducci,
@@ -46,6 +49,11 @@ Analizza il documento allegato (fattura, bolletta, ricevuta o nota) ed estrai qu
 - imponibile: l'importo imponibile complessivo, in euro
 - iva: l'importo dell'IVA in euro (l'importo, non l'aliquota percentuale)
 - totale: l'importo totale del documento, in euro
+- nota_credito: true se il documento è una NOTA DI CREDITO (storno, reso o
+  accredito che annulla in tutto o in parte una fattura precedente); false per
+  una normale fattura, bolletta o ricevuta. Riconoscila da diciture come
+  "nota di credito", "nota di accredito", "storno", "reso". Anche per una nota
+  di credito riporta gli importi come numeri positivi: al segno ci pensa l'app.
 - categoria: una sola tra queste:
   · "Vendita vino" → vino o prodotti della cantina venduti ai clienti
   · "Imballaggi" → bottiglie, tappi, capsule, etichette, cartoni, gabbiette
@@ -76,7 +84,8 @@ export const RESPONSE_SCHEMA = {
     imponibile: { type: 'NUMBER' },
     iva: { type: 'NUMBER' },
     totale: { type: 'NUMBER' },
+    nota_credito: { type: 'BOOLEAN', description: 'true se è una nota di credito/storno' },
     categoria: { type: 'STRING', enum: CATEGORIES },
   },
-  required: ['tipo', 'controparte', 'data', 'scadenza', 'partita_iva', 'imponibile', 'iva', 'totale', 'categoria'],
+  required: ['tipo', 'controparte', 'data', 'scadenza', 'partita_iva', 'imponibile', 'iva', 'totale', 'nota_credito', 'categoria'],
 };

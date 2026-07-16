@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { CATEGORIES } from '../config.js';
+import { CATEGORIES, METODI_PAGAMENTO } from '../config.js';
+import { sommaNonQuadra, trovaDoppioni, netto, parseImporto } from '../calcoli.js';
 
 const TIPO_LABELS = { acquisto: 'Acquisto', vendita: 'Vendita' };
 
@@ -17,9 +18,17 @@ const COLUMNS = [
   { key: 'scadenza', label: 'Scadenza', type: 'text' },
   { key: 'partita_iva', label: 'Partita IVA', type: 'text' },
   { key: 'categoria', label: 'Categoria', type: 'select', options: CATEGORIES },
+  {
+    key: 'metodo',
+    label: 'Pagamento',
+    type: 'select',
+    options: ['', ...METODI_PAGAMENTO],
+    optionLabel: (v) => v || '—',
+  },
   { key: 'imponibile', label: 'Imponibile', type: 'number' },
   { key: 'iva', label: 'IVA', type: 'number' },
   { key: 'totale', label: 'Totale', type: 'number' },
+  { key: 'nota', label: 'Note', type: 'text' },
 ];
 
 const euroFormat = new Intl.NumberFormat('it-IT', {
@@ -29,46 +38,6 @@ const euroFormat = new Intl.NumberFormat('it-IT', {
 
 function formatEuro(v) {
   return euroFormat.format(Number(v) || 0) + ' €';
-}
-
-// Accetta sia "1.234,56" (formato italiano) sia "1234.56".
-function parseImporto(str) {
-  const s = String(str).replace(/[€\s]/g, '');
-  if (!s) return 0;
-  if (s.includes(',')) return parseFloat(s.replace(/\./g, '').replace(',', '.')) || 0;
-  return parseFloat(s) || 0;
-}
-
-// Due documenti con stessa controparte, stessa data e stesso totale sono
-// quasi certamente lo stesso foglio caricato due volte: la mappa restituita
-// associa l'id di ogni copia al nome del file caricato per primo.
-function trovaDoppioni(rows) {
-  const primi = new Map();
-  const doppioni = new Map();
-  for (const r of rows) {
-    if (r.status !== 'done') continue;
-    const chi = /^\d{11}$/.test(r.partita_iva || '')
-      ? 'piva:' + r.partita_iva
-      : String(r.controparte || '').toLowerCase().replace(/\s+/g, ' ').trim();
-    const totale = Number(r.totale) || 0;
-    if (!chi || !totale || !r.data) continue;
-    const chiave = chi + '|' + r.data + '|' + totale.toFixed(2);
-    if (primi.has(chiave)) doppioni.set(r.id, primi.get(chiave).fileName);
-    else primi.set(chiave, r);
-  }
-  return doppioni;
-}
-
-// Se imponibile + IVA non fa il totale, restituisce la somma calcolata
-// (con una piccola tolleranza per gli arrotondamenti), altrimenti null.
-function sommaChenonQuadra(row) {
-  if (row.status !== 'done') return null;
-  const imp = Number(row.imponibile) || 0;
-  const iva = Number(row.iva) || 0;
-  const tot = Number(row.totale) || 0;
-  if (!imp && !iva && !tot) return null;
-  const somma = imp + iva;
-  return Math.abs(somma - tot) > 0.05 ? somma : null;
 }
 
 function EditableCell({ value, column, onCommit }) {
@@ -189,7 +158,7 @@ export default function DataTable({ rows, vuotoPerFiltri, onEdit, onRetry, onDel
     );
   }
 
-  const sum = (key) => rows.reduce((acc, r) => acc + (Number(r[key]) || 0), 0);
+  const sum = (key) => rows.reduce((acc, r) => acc + netto(r, key), 0);
   const doppioni = trovaDoppioni(rows);
 
   return (
@@ -203,13 +172,16 @@ export default function DataTable({ rows, vuotoPerFiltri, onEdit, onRetry, onDel
                 {c.label}
               </th>
             ))}
+            <th className="th-pagata" title="Nota di credito (storno): viene sottratta dai totali">
+              N.C.
+            </th>
             <th className="th-pagata">Pagata</th>
             <th />
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => {
-            const somma = sommaChenonQuadra(row);
+            const somma = sommaNonQuadra(row);
             const doppioneDi = doppioni.get(row.id);
             const rowClass =
               row.status === 'error'
@@ -228,6 +200,11 @@ export default function DataTable({ rows, vuotoPerFiltri, onEdit, onRetry, onDel
                     {row.fileName}
                   </button>
                   <StatusChip row={row} onRetry={() => onRetry(row.id)} />
+                  {row.notaCredito && (
+                    <div className="nc-badge" title="Nota di credito: sottratta dai totali">
+                      ↩ Nota di credito
+                    </div>
+                  )}
                   {row.status === 'error' && <div className="error-text">{row.error}</div>}
                   {somma !== null && (
                     <div
@@ -265,6 +242,16 @@ export default function DataTable({ rows, vuotoPerFiltri, onEdit, onRetry, onDel
                   <input
                     type="checkbox"
                     className="check-pagata"
+                    checked={!!row.notaCredito}
+                    onChange={(e) => onEdit(row.id, { notaCredito: e.target.checked })}
+                    title="Nota di credito (storno): viene sottratta dai totali"
+                    aria-label={'Nota di credito: ' + row.fileName}
+                  />
+                </td>
+                <td className="td-pagata">
+                  <input
+                    type="checkbox"
+                    className="check-pagata"
                     checked={!!row.pagato}
                     onChange={(e) => onEdit(row.id, { pagato: e.target.checked })}
                     title={row.tipo === 'vendita' ? 'Incassata' : 'Pagata'}
@@ -289,11 +276,11 @@ export default function DataTable({ rows, vuotoPerFiltri, onEdit, onRetry, onDel
         </tbody>
         <tfoot>
           <tr>
-            <td colSpan={7}>Totali</td>
+            <td colSpan={8}>Totali (le note di credito sono già sottratte)</td>
             <td className="td-num">{formatEuro(sum('imponibile'))}</td>
             <td className="td-num">{formatEuro(sum('iva'))}</td>
             <td className="td-num">{formatEuro(sum('totale'))}</td>
-            <td colSpan={2} />
+            <td colSpan={4} />
           </tr>
         </tfoot>
       </table>
