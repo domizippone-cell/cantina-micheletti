@@ -20,12 +20,12 @@
 // ============================================================================
 
 export const firebaseConfig = {
-  apiKey: '',
-  authDomain: '',
-  projectId: '',
-  storageBucket: '',
-  messagingSenderId: '',
-  appId: '',
+  apiKey: 'AIzaSyD6S4JOJp08qbmY4rK_GBjEoe7x-zWSplU',
+  authDomain: 'cantina-micheletti.firebaseapp.com',
+  projectId: 'cantina-micheletti',
+  storageBucket: 'cantina-micheletti.firebasestorage.app',
+  messagingSenderId: '156255090355',
+  appId: '1:156255090355:web:a8504a26e10a6b042fa2c6',
 };
 
 // Sync considerata configurata solo se i campi essenziali sono compilati.

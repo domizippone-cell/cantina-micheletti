@@ -139,13 +139,21 @@ export async function spingiLocaliNelCloud(righeLocali, remoteEsistenti, leggiFi
   for (const row of righeLocali) {
     if (!row?.id) continue;
     if (idRemoti.has(row.id) || impronteRemote.has(impronta(row))) continue;
+    // I dati della riga prima di tutto: è la parte importante e deve arrivare
+    // nel cloud anche se lo Storage non è attivo (scansioni non sincronizzate).
     try {
-      const file = leggiFileLocale ? await leggiFileLocale(row.id) : null;
-      if (file) await caricaFile(row.id, file);
       await salvaRiga(row);
       caricate += 1;
     } catch {
-      /* un documento problematico non blocca gli altri */
+      continue;
+    }
+    // Scansione originale: best-effort, non deve bloccare la sincronizzazione
+    // dei dati (fallisce senza Storage/Blaze o se il file non c'è più).
+    try {
+      const file = leggiFileLocale ? await leggiFileLocale(row.id) : null;
+      if (file) await caricaFile(row.id, file);
+    } catch {
+      /* Storage non attivo o file assente: pazienza, i dati sono comunque saliti */
     }
   }
   return caricate;
