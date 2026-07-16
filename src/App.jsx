@@ -10,25 +10,45 @@ import { exportCsv } from './csv.js';
 import { salvaDocumento, leggiDocumento, eliminaDocumento, svuotaDocumenti } from './db.js';
 import { ricordaControparte, applicaMemoria } from './memoria.js';
 import { chiaveMese } from './date.js';
+import {
+  syncConfigurato,
+  syncAttiva,
+  getSyncCode,
+  setSyncCode,
+  generaSyncCode,
+  avviaSync,
+  salvaRiga,
+  eliminaRiga,
+  caricaFile,
+  ottieniFile,
+  leggiTutteRemote,
+  spingiLocaliNelCloud,
+} from './sync.js';
 
 const ROWS_STORAGE = 'estrattore.rows';
 
-// Le righe rimaste a metà da una sessione precedente diventano errori
-// (si possono riprovare: il file è nell'archivio del dispositivo); le
-// righe salvate da versioni precedenti dell'app — o arrivate da un backup —
-// ricevono i campi nuovi.
-function sanificaRiga(r) {
+// Riempie i campi mancanti di una riga con i valori di default.
+function conDefault(r) {
   return {
     tipo: 'acquisto',
     categoria: 'Altro',
     scadenza: '',
     pagato: false,
+    error: '',
     ...r,
     controparte: r.controparte ?? r.fornitore ?? '',
-    ...(r.status === 'queued' || r.status === 'processing'
-      ? { status: 'error', error: 'Elaborazione interrotta: premi Riprova.' }
-      : {}),
   };
+}
+
+// Come conDefault, ma tratta le righe rimaste "a metà" da una sessione locale
+// precedente come errori riprovabili. Da usare SOLO sui dati locali: sui dati
+// remoti lo stato "in elaborazione" può appartenere a un altro dispositivo.
+function sanificaRiga(r) {
+  const base = conDefault(r);
+  if (r.status === 'queued' || r.status === 'processing') {
+    return { ...base, status: 'error', error: 'Elaborazione interrotta: premi Riprova.' };
+  }
+  return base;
 }
 
 function loadRows() {
@@ -40,7 +60,10 @@ function loadRows() {
 }
 
 export default function App() {
-  const [rows, setRows] = useState(loadRows);
+  // In modalità sincronizzata i dati arrivano da Firestore; in locale da
+  // localStorage. syncOn è deciso all'avvio: attivare/disattivare ricarica.
+  const [syncOn] = useState(syncAttiva);
+  const [rows, setRows] = useState(() => (syncOn ? [] : loadRows()));
   const [view, setView] = useState('documenti');
   const [filtri, setFiltri] = useState(FILTRI_VUOTI);
   const [showSettings, setShowSettings] = useState(false);
@@ -48,10 +71,65 @@ export default function App() {
   const toastTimer = useRef(null);
   const filesRef = useRef(new Map()); // id riga → File, per l'elaborazione in corso
   const queueRef = useRef(Promise.resolve()); // coda sequenziale, evita i limiti di frequenza
+  const rowsRef = useRef(rows); // sempre l'ultimo valore, per le scritture remote
 
   useEffect(() => {
-    localStorage.setItem(ROWS_STORAGE, JSON.stringify(rows));
+    rowsRef.current = rows;
   }, [rows]);
+
+  // In locale: salva le righe su questo dispositivo a ogni modifica.
+  // In sync: la fonte è Firestore (con la sua cache offline), non localStorage.
+  useEffect(() => {
+    if (syncOn) return;
+    localStorage.setItem(ROWS_STORAGE, JSON.stringify(rows));
+  }, [rows, syncOn]);
+
+  // Blob originale dall'archivio locale, come File (per caricarlo nel cloud).
+  async function leggiFileLocale(id) {
+    try {
+      const rec = await leggiDocumento(id);
+      if (!rec?.blob) return null;
+      return new File([rec.blob], rec.name || '', { type: rec.type || rec.blob.type });
+    } catch {
+      return null;
+    }
+  }
+
+  // Avvio della sincronizzazione: prima porta nel cloud i documenti che erano
+  // solo su questo dispositivo (una volta sola), poi ascolta in tempo reale.
+  useEffect(() => {
+    if (!syncOn) return;
+    let vivo = true;
+    let stacca = null;
+    (async () => {
+      try {
+        const locali = JSON.parse(localStorage.getItem(ROWS_STORAGE) || '[]');
+        if (locali.length) {
+          const remote = await leggiTutteRemote();
+          await spingiLocaliNelCloud(locali.map(sanificaRiga), remote, leggiFileLocale);
+          localStorage.removeItem(ROWS_STORAGE);
+        }
+      } catch {
+        /* la migrazione può fallire senza bloccare l'ascolto */
+      }
+      try {
+        const off = await avviaSync({
+          onRows: (righe) => {
+            if (vivo) setRows(righe.map(conDefault));
+          },
+          onErrore: () => mostraAvviso('Sincronizzazione: connessione assente, riprovo da solo.'),
+        });
+        if (vivo) stacca = off;
+        else off();
+      } catch {
+        mostraAvviso('Sincronizzazione non disponibile: controlla la configurazione Firebase.');
+      }
+    })();
+    return () => {
+      vivo = false;
+      if (stacca) stacca();
+    };
+  }, [syncOn]);
 
   function mostraAvviso(msg) {
     setToast(msg);
@@ -59,14 +137,18 @@ export default function App() {
     toastTimer.current = setTimeout(() => setToast(''), 4000);
   }
 
+  // Aggiorna una riga in locale e, se la sync è attiva, la propaga nel cloud.
   function patch(id, changes) {
+    const attuale = rowsRef.current.find((r) => r.id === id);
     setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...changes } : r)));
+    if (syncOn && attuale) salvaRiga({ ...attuale, ...changes }).catch(() => {});
   }
 
   async function processRow(id) {
     let file = filesRef.current.get(id);
     if (!file) {
-      // Dopo un riavvio il file non è più in memoria: recuperalo dall'archivio.
+      // Dopo un riavvio il file non è più in memoria: recuperalo dall'archivio
+      // locale o, in sincronizzazione, scaricalo dal cloud.
       try {
         const rec = await leggiDocumento(id);
         if (rec) {
@@ -75,6 +157,15 @@ export default function App() {
         }
       } catch {
         /* archivio non disponibile: gestito sotto */
+      }
+      if (!file && syncOn) {
+        const blob = await ottieniFile(id);
+        if (blob) {
+          const nome = rowsRef.current.find((r) => r.id === id)?.fileName || '';
+          file = new File([blob], nome, { type: blob.type });
+          filesRef.current.set(id, file);
+          salvaDocumento(id, file).catch(() => {});
+        }
       }
     }
     if (!file) {
@@ -103,6 +194,7 @@ export default function App() {
       const id = crypto.randomUUID();
       filesRef.current.set(id, file);
       salvaDocumento(id, file).catch(() => {});
+      if (syncOn) caricaFile(id, file).catch(() => {});
       return {
         id,
         fileName: file.name,
@@ -121,7 +213,10 @@ export default function App() {
       };
     });
     setRows((rs) => [...rs, ...newRows]);
-    newRows.forEach((r) => enqueue(r.id));
+    newRows.forEach((r) => {
+      if (syncOn) salvaRiga(r).catch(() => {});
+      enqueue(r.id);
+    });
   }
 
   function handleEdit(id, changes) {
@@ -129,7 +224,7 @@ export default function App() {
     // Le correzioni manuali su controparte/categoria/P.IVA vanno ricordate
     // per i prossimi documenti della stessa controparte.
     if ('categoria' in changes || 'controparte' in changes || 'partita_iva' in changes) {
-      const row = rows.find((r) => r.id === id);
+      const row = rowsRef.current.find((r) => r.id === id);
       if (row) ricordaControparte({ ...row, ...changes });
     }
   }
@@ -142,10 +237,15 @@ export default function App() {
     filesRef.current.delete(id);
     eliminaDocumento(id).catch(() => {});
     setRows((rs) => rs.filter((r) => r.id !== id));
+    if (syncOn) eliminaRiga(id).catch(() => {});
   }
 
   function handleClear() {
-    if (window.confirm('Vuoi davvero svuotare la tabella? I dati non esportati e i file archiviati andranno persi.')) {
+    const messaggio = syncOn
+      ? 'Vuoi svuotare la tabella su TUTTI i dispositivi sincronizzati? I documenti e le scansioni verranno eliminati ovunque.'
+      : 'Vuoi davvero svuotare la tabella? I dati non esportati e i file archiviati andranno persi.';
+    if (window.confirm(messaggio)) {
+      if (syncOn) rowsRef.current.forEach((r) => eliminaRiga(r.id).catch(() => {}));
       filesRef.current.clear();
       svuotaDocumenti().catch(() => {});
       setRows([]);
@@ -155,11 +255,23 @@ export default function App() {
   async function handleOpenFile(id) {
     try {
       const rec = await leggiDocumento(id);
-      if (!rec) {
-        mostraAvviso('Il documento originale non è archiviato su questo dispositivo.');
+      let blob = rec?.blob || null;
+      if (!blob && syncOn) {
+        blob = await ottieniFile(id);
+        if (blob) {
+          const nome = rowsRef.current.find((r) => r.id === id)?.fileName || '';
+          salvaDocumento(id, new File([blob], nome, { type: blob.type })).catch(() => {});
+        }
+      }
+      if (!blob) {
+        mostraAvviso(
+          syncOn
+            ? 'Scansione non ancora disponibile nel cloud.'
+            : 'Il documento originale non è archiviato su questo dispositivo.'
+        );
         return;
       }
-      const url = URL.createObjectURL(rec.blob);
+      const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch {
@@ -169,13 +281,40 @@ export default function App() {
 
   // Import "aggiungi": dal backup arrivano solo le righe non già presenti.
   function handleAggiungiRighe(nuove) {
-    if (nuove.length > 0) setRows((rs) => [...rs, ...nuove.map(sanificaRiga)]);
+    if (nuove.length === 0) return;
+    const pulite = nuove.map(sanificaRiga);
+    setRows((rs) => [...rs, ...pulite]);
+    if (syncOn) pulite.forEach((r) => salvaRiga(r).catch(() => {}));
   }
 
   // Import "sostituisci": il backup rimpiazza in blocco i dati del dispositivo.
   function handleSostituisciRighe(righe) {
     filesRef.current.clear();
-    setRows(righe.map(sanificaRiga));
+    const pulite = righe.map(sanificaRiga);
+    if (syncOn) {
+      rowsRef.current.forEach((r) => eliminaRiga(r.id).catch(() => {}));
+      pulite.forEach((r) => salvaRiga(r).catch(() => {}));
+    }
+    setRows(pulite);
+  }
+
+  // Attiva la sincronizzazione: genera un codice e ricarica in modalità sync
+  // (la migrazione dei dati locali avviene all'avvio).
+  function handleAttivaSync() {
+    setSyncCode(generaSyncCode());
+    location.reload();
+  }
+
+  // Disattiva su questo dispositivo: salva i dati attuali in locale, così non
+  // spariscono, poi torna in modalità locale.
+  function handleDisattivaSync() {
+    try {
+      localStorage.setItem(ROWS_STORAGE, JSON.stringify(rowsRef.current));
+    } catch {
+      /* se non riesce a salvare, i dati restano comunque nel cloud */
+    }
+    setSyncCode('');
+    location.reload();
   }
 
   const busy = rows.some((r) => r.status === 'queued' || r.status === 'processing');
@@ -207,14 +346,21 @@ export default function App() {
             <p>Fatture di acquisto e vendita → tabella pronta per Excel</p>
           </div>
         </div>
-        <button
-          className="btn btn-ghost"
-          onClick={() => setShowSettings(true)}
-          title="Impostazioni chiave API"
-          aria-label="Impostazioni"
-        >
-          ⚙️
-        </button>
+        <div className="header-actions">
+          {syncOn && (
+            <span className="sync-pill" title="I documenti si sincronizzano tra i tuoi dispositivi">
+              ☁ Sincronizzato
+            </span>
+          )}
+          <button
+            className="btn btn-ghost"
+            onClick={() => setShowSettings(true)}
+            title="Impostazioni"
+            aria-label="Impostazioni"
+          >
+            ⚙️
+          </button>
+        </div>
       </header>
 
       <main className="main">
@@ -312,7 +458,9 @@ export default function App() {
       </main>
 
       <footer className="footer">
-        I dati restano su questo dispositivo · Estrazione con Google Gemini
+        {syncOn
+          ? 'Documenti sincronizzati tra i tuoi dispositivi · Estrazione con Google Gemini'
+          : 'I dati restano su questo dispositivo · Estrazione con Google Gemini'}
       </footer>
 
       {showSettings && (
@@ -321,6 +469,11 @@ export default function App() {
           rows={rows}
           onAggiungiRighe={handleAggiungiRighe}
           onSostituisciRighe={handleSostituisciRighe}
+          syncConfig={syncConfigurato()}
+          syncOn={syncOn}
+          syncCode={syncOn ? getSyncCode() : ''}
+          onAttivaSync={handleAttivaSync}
+          onDisattivaSync={handleDisattivaSync}
         />
       )}
       {toast && <div className="toast">{toast}</div>}

@@ -3,14 +3,18 @@ import { createRoot } from 'react-dom/client';
 import { registerSW } from 'virtual:pwa-register';
 import App from './App.jsx';
 import { setApiKey } from './gemini.js';
+import { setSyncCode } from './sync.js';
 import './styles.css';
 
-// Setup a distanza: aprendo l'app con  #key=LA_CHIAVE  la chiave viene salvata
-// su questo dispositivo e sparisce subito dall'indirizzo. Il frammento dopo #
-// non viene mai inviato al server.
-const match = location.hash.match(/key=([^&]+)/);
-if (match) {
-  setApiKey(decodeURIComponent(match[1]));
+// Setup a distanza tramite il frammento dopo #, che non viene mai inviato al
+// server e viene ripulito subito dall'indirizzo:
+//   #key=LA_CHIAVE    → salva la chiave API di Gemini su questo dispositivo
+//   #sync=IL_CODICE   → collega questo dispositivo alla sincronizzazione
+const chiave = location.hash.match(/key=([^&]+)/);
+if (chiave) setApiKey(decodeURIComponent(chiave[1]));
+const codiceSync = location.hash.match(/sync=([^&]+)/);
+if (codiceSync) setSyncCode(decodeURIComponent(codiceSync[1]));
+if (chiave || codiceSync) {
   history.replaceState(null, '', location.pathname + location.search);
 }
 

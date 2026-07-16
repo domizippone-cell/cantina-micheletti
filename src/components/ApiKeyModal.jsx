@@ -2,16 +2,49 @@ import React, { useRef, useState } from 'react';
 import { getApiKey, setApiKey } from '../gemini.js';
 import { esportaBackup, leggiBackup, aggiungiDaBackup, sostituisciConBackup } from '../backup.js';
 
-export default function ApiKeyModal({ onClose, rows, onAggiungiRighe, onSostituisciRighe }) {
+export default function ApiKeyModal({
+  onClose,
+  rows,
+  onAggiungiRighe,
+  onSostituisciRighe,
+  syncConfig,
+  syncOn,
+  syncCode,
+  onAttivaSync,
+  onDisattivaSync,
+}) {
   const [key, setKey] = useState(getApiKey());
   const [show, setShow] = useState(false);
   const [statoBackup, setStatoBackup] = useState('');
   const [inAttesa, setInAttesa] = useState(null); // backup letto, in attesa della scelta
+  const [copiato, setCopiato] = useState(false);
   const importRef = useRef(null);
+
+  const linkSync = syncCode
+    ? `${location.origin}${location.pathname}#sync=${syncCode}`
+    : '';
 
   function save() {
     setApiKey(key);
     onClose();
+  }
+
+  async function copiaLink() {
+    try {
+      await navigator.clipboard.writeText(linkSync);
+      setCopiato(true);
+      setTimeout(() => setCopiato(false), 2000);
+    } catch {
+      setCopiato(false);
+    }
+  }
+
+  function attiva() {
+    const ok = window.confirm(
+      'Attivo la sincronizzazione? I documenti verranno salvati nel cloud (Firebase) e ' +
+        'condivisi con i dispositivi che apri con lo stesso link. Potrai disattivarla quando vuoi.'
+    );
+    if (ok) onAttivaSync();
   }
 
   async function handleEsporta() {
@@ -25,7 +58,6 @@ export default function ApiKeyModal({ onClose, rows, onAggiungiRighe, onSostitui
     }
   }
 
-  // Passo 1: leggi il file e chiedi come importarlo.
   async function handleFileScelto(file) {
     if (!file) return;
     setStatoBackup('Lettura del backup…');
@@ -39,7 +71,6 @@ export default function ApiKeyModal({ onClose, rows, onAggiungiRighe, onSostitui
     }
   }
 
-  // Passo 2: applica il backup nel modo scelto.
   async function applica(modo) {
     const backup = inAttesa;
     setInAttesa(null);
@@ -104,11 +135,58 @@ export default function ApiKeyModal({ onClose, rows, onAggiungiRighe, onSostitui
         </p>
 
         <div className="modal-sezione">
-          <h3>Backup e trasferimento</h3>
+          <h3>Sincronizzazione tra dispositivi</h3>
+          {!syncConfig && (
+            <p className="modal-text">
+              Non ancora configurata. Con Firebase i documenti si aggiornano da soli tra PC e
+              telefono, senza esportare backup. Le istruzioni (una tantum) sono nel file
+              <code> SETUP_SYNC.md</code> del progetto. Finché non è configurata, l'app funziona
+              in locale e puoi usare il backup manuale qui sotto.
+            </p>
+          )}
+
+          {syncConfig && !syncOn && (
+            <>
+              <p className="modal-text">
+                Attiva la sincronizzazione per condividere i documenti in tempo reale con i tuoi
+                dispositivi: carichi una fattura sul telefono e compare sul PC da sola, senza
+                esportare né importare nulla.
+              </p>
+              <button className="btn btn-primary" onClick={attiva}>
+                ☁ Attiva sincronizzazione
+              </button>
+            </>
+          )}
+
+          {syncConfig && syncOn && (
+            <>
+              <p className="modal-text">
+                <strong>☁ Attiva.</strong> Per collegare un altro dispositivo, aprilo con questo
+                link (una volta sola): vedrà subito gli stessi documenti.
+              </p>
+              <div className="sync-link-row">
+                <input className="key-input" readOnly value={linkSync} onFocus={(e) => e.target.select()} />
+                <button className="btn btn-ghost" onClick={copiaLink}>
+                  {copiato ? 'Copiato ✓' : 'Copia'}
+                </button>
+              </div>
+              <p className="modal-hint">
+                Tienilo privato: chi ha il link vede i documenti. Puoi{' '}
+                <button className="link-btn" onClick={onDisattivaSync}>
+                  disattivare la sincronizzazione su questo dispositivo
+                </button>
+                .
+              </p>
+            </>
+          )}
+        </div>
+
+        <div className="modal-sezione">
+          <h3>Backup e copia di sicurezza</h3>
           <p className="modal-text">
-            I dati vivono solo su questo dispositivo. Per portarli su un altro (o tenerne una
-            copia), esporta il backup qui e importalo dall'altra parte: contiene tabella,
-            documenti originali e memoria fornitori.
+            {syncOn
+              ? 'Con la sincronizzazione attiva i dati sono già al sicuro nel cloud. Il backup resta utile per tenerne una copia scaricata o per esportare tutto.'
+              : 'Esporta un file con tabella, documenti originali e memoria fornitori, da importare su un altro dispositivo o da conservare come copia.'}
           </p>
           <div className="backup-row">
             <button className="btn btn-ghost" onClick={handleEsporta}>

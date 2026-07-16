@@ -56,6 +56,25 @@ body {
   gap: 14px;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sync-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 5px 11px;
+  border-radius: 99px;
+  background: var(--ok-soft);
+  color: var(--ok);
+  white-space: nowrap;
+}
+
 .logo {
   width: 44px;
   height: 44px;
@@ -893,6 +912,35 @@ button.file-name:hover {
 .modal-sezione h3 {
   margin: 0 0 8px;
   font-size: 15px;
+}
+
+.modal-sezione code {
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 12.5px;
+  background: var(--bg);
+  padding: 1px 5px;
+  border-radius: 5px;
+}
+
+.sync-link-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.sync-link-row .key-input {
+  font-size: 12.5px;
+  color: var(--text-soft);
+}
+
+.link-btn {
+  font: inherit;
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
 }
 
 .backup-row {
